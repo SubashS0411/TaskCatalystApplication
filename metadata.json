@@ -1,0 +1,6 @@
+{
+  "name": "TaskCatalyst",
+  "description": "An Eisenhower Matrix task management app with a focus mode timer, built to help users prioritize and execute tasks without distraction.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
