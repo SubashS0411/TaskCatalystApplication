@@ -7,7 +7,7 @@ import { IntegrationsModal } from './components/IntegrationsModal';
 import { BrainDumpModal } from './components/BrainDumpModal';
 import { DashboardStats } from './components/DashboardStats';
 import { Task } from './types';
-import { Search, Cloud, Sparkles, BarChart3 } from 'lucide-react';
+import { Search, Cloud, Sparkles, BarChart3, Palette } from 'lucide-react';
 
 export default function App() {
   const { tasks, addTask, updateTask, deleteTask, toggleCompletion, reorderTask } = useTasks();
@@ -22,6 +22,13 @@ export default function App() {
   
   const [consecutiveQ1, setConsecutiveQ1] = useState(0);
   const [suggestedBreakTask, setSuggestedBreakTask] = useState<Task | undefined>(undefined);
+
+  const [theme, setTheme] = useState<'default' | 'pastel' | 'high-contrast' | 'monochromatic'>('default');
+
+  const cycleTheme = () => {
+    const themes: Array<'default' | 'pastel' | 'high-contrast' | 'monochromatic'> = ['default', 'pastel', 'high-contrast', 'monochromatic'];
+    setTheme(prev => themes[(themes.indexOf(prev) + 1) % themes.length]);
+  };
 
   const handleOpenNewTask = () => {
     setEditingTask(undefined);
@@ -132,6 +139,14 @@ export default function App() {
 
         <div className="flex items-center gap-4 sm:gap-6">
           <button
+            onClick={cycleTheme}
+            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-semibold transition-colors capitalize"
+          >
+            <Palette size={18} />
+            <span className="hidden sm:inline">{theme} Theme</span>
+          </button>
+          
+          <button
             onClick={() => setIsStatsOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-semibold transition-colors"
           >
@@ -169,6 +184,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-7xl mx-auto p-6 min-h-0 flex flex-col">
         <TaskGrid 
           tasks={filteredTasks}
+          theme={theme}
           onToggleCompletion={handleToggleCompletion}
           onDelete={deleteTask}
           onEdit={handleEditTask}
