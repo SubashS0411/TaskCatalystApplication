@@ -9,6 +9,7 @@ export interface Task {
   dueDate?: number; // timestamp
   recurrence?: RecurrencePattern;
   estimatedTime?: number; // minutes
+  actualTimeSpent?: number; // seconds
   isCompleted: boolean;
   createdAt: number;
 }

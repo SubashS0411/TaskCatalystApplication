@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task } from '../types';
 import { TaskCard } from './TaskCard';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface TaskGridProps {
   tasks: Task[];
@@ -215,14 +216,19 @@ export function TaskGrid({ tasks, theme = 'default', onToggleCompletion, onDelet
 
   return (
     <div className="flex-1 grid grid-cols-1 md:grid-cols-2 grid-rows-[auto_auto] md:grid-rows-2 gap-4 h-full min-h-0">
-      {quadrants.map(q => (
+      {quadrants.map(q => {
+        const total = q.tasks.length;
+        const completed = q.tasks.filter(t => t.isCompleted).length;
+        const progressPercent = total === 0 ? 0 : (completed / total) * 100;
+        
+        return (
         <section 
           key={q.id} 
           className={`flex flex-col border-t-4 ${q.colorClass} ${q.containerClass} min-h-[300px] md:min-h-0 relative transition-transform duration-200 ease-out`}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, q.isUrgent, q.isImportant)}
         >
-          <header className={`flex flex-none items-center justify-between p-4 border-b ${q.headerBg}`}>
+          <header className={`relative flex flex-none items-center justify-between p-4 border-b overflow-hidden ${q.headerBg}`}>
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${q.dotColor}`}></span>
               <h2 className={`text-sm font-bold uppercase tracking-wider ${q.titleColor}`}>{q.title}</h2>
@@ -230,6 +236,12 @@ export function TaskGrid({ tasks, theme = 'default', onToggleCompletion, onDelet
             <span className={`text-xs font-bold px-2 py-1 rounded-full ${q.badgeColor}`}>
               {q.tasks.length} {q.tasks.length === 1 ? 'Task' : 'Tasks'}
             </span>
+            {total > 0 && (
+              <div 
+                className={`absolute bottom-0 left-0 h-1 transition-all duration-500 ease-out ${q.dotColor}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            )}
           </header>
           
           <div className="flex-1 p-3 overflow-y-auto min-h-0 flex flex-col gap-2">
@@ -238,25 +250,36 @@ export function TaskGrid({ tasks, theme = 'default', onToggleCompletion, onDelet
                  <p className="text-xs font-medium text-slate-400">{q.emptyTitle}</p>
                </div>
              ) : (
-               <div className="space-y-2 pb-2">
-                 {q.tasks.map(task => (
-                   <TaskCard 
-                     key={task.id} 
-                     task={task} 
-                     onToggleCompletion={onToggleCompletion}
-                     onDelete={onDelete}
-                     onEdit={onEdit}
-                     onStartFocus={q.canFocus ? onStartFocus : undefined}
-                     onDropTask={(taskId) => {
-                        if (onDropTask) onDropTask(taskId, task.id, q.isUrgent, q.isImportant);
-                     }}
-                   />
-                 ))}
+               <div className="space-y-2 pb-2 overflow-x-hidden">
+                 <AnimatePresence mode="popLayout">
+                   {q.tasks.map(task => (
+                     <motion.div
+                       key={task.id}
+                       layout
+                       initial={{ opacity: 0, scale: 0.95 }}
+                       animate={{ opacity: 1, scale: 1 }}
+                       exit={{ opacity: 0, scale: 0.95 }}
+                       transition={{ duration: 0.2 }}
+                     >
+                       <TaskCard 
+                         task={task} 
+                         onToggleCompletion={onToggleCompletion}
+                         onDelete={onDelete}
+                         onEdit={onEdit}
+                         onStartFocus={q.canFocus ? onStartFocus : undefined}
+                         onDropTask={(taskId) => {
+                            if (onDropTask) onDropTask(taskId, task.id, q.isUrgent, q.isImportant);
+                         }}
+                       />
+                     </motion.div>
+                   ))}
+                 </AnimatePresence>
                </div>
              )}
           </div>
         </section>
-      ))}
+        );
+      })}
     </div>
   );
 }

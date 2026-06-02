@@ -1,21 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Task } from '../types';
-import { Pause, Play, Square, CheckCircle2 } from 'lucide-react';
+import { Pause, Play, Square, CheckCircle2, Headphones } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface FocusModeProps {
   task: Task;
   onClose: () => void;
   onCompleteTask: (id: string) => void;
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void;
 }
+
+type AmbientSound = 'none' | 'white' | 'brown';
 
 const DEFAULT_TIME = 25 * 60; // 25 minutes in seconds
 
-export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
+export function FocusMode({ task, onClose, onCompleteTask, onUpdateTask }: FocusModeProps) {
   const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME);
   const [isActive, setIsActive] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
+  const [ambientSound, setAmbientSound] = useState<AmbientSound>('none');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  
   const audioContextRef = useRef<AudioContext | null>(null);
+  const ambientSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const ambientGainRef = useRef<GainNode | null>(null);
 
   useEffect(() => {
     // Request notification permission on mount
@@ -28,6 +36,7 @@ export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
     if (isActive && timeLeft > 0) {
       interval = window.setInterval(() => {
         setTimeLeft((prev) => prev - 1);
+        setElapsedSeconds((prev) => prev + 1);
       }, 1000);
     } else if (timeLeft === 0 && !isFinished) {
       setIsFinished(true);
@@ -35,8 +44,78 @@ export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
       playAlarm();
     }
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      stopAmbientSound();
+    };
   }, [isActive, timeLeft, isFinished]);
+
+  const initAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  };
+
+  const stopAmbientSound = () => {
+    if (ambientSourceRef.current) {
+      try { ambientSourceRef.current.stop(); } catch (e) {}
+      ambientSourceRef.current.disconnect();
+      ambientSourceRef.current = null;
+    }
+    if (ambientGainRef.current) {
+      ambientGainRef.current.disconnect();
+      ambientGainRef.current = null;
+    }
+  };
+
+  const playAmbientSoundType = (type: AmbientSound) => {
+    stopAmbientSound();
+    if (type === 'none') return;
+    
+    const ctx = initAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = buffer.getChannelData(0);
+    
+    if (type === 'white') {
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+    } else if (type === 'brown') {
+      let lastOut = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        let out = (lastOut + (0.02 * white)) / 1.02;
+        lastOut = out;
+        output[i] = out * 3.5;
+      }
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    
+    const gain = ctx.createGain();
+    gain.gain.value = 0.05; // Low volume
+
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    
+    source.start();
+    ambientSourceRef.current = source;
+    ambientGainRef.current = gain;
+  };
+
+  useEffect(() => {
+    if (ambientSound !== 'none' && isActive && !isFinished) {
+      playAmbientSoundType(ambientSound);
+    } else {
+      stopAmbientSound();
+    }
+  }, [ambientSound, isActive, isFinished]);
 
   const playAlarm = () => {
     // Attempt standard browser notification if permitted
@@ -52,10 +131,9 @@ export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
 
     // Simple oscillator beep using Web Audio API so we don't need external sound files
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = initAudioContext();
+      if (ctx.state === 'suspended') ctx.resume();
+      
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
@@ -87,13 +165,44 @@ export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
     setTimeLeft(DEFAULT_TIME);
   };
 
-  const handleComplete = () => {
-    onCompleteTask(task.id);
+  const handleClose = () => {
+    if (elapsedSeconds > 0 && onUpdateTask) {
+      onUpdateTask(task.id, { actualTimeSpent: (task.actualTimeSpent || 0) + elapsedSeconds });
+    }
     onClose();
+  };
+
+  const handleComplete = () => {
+    if (elapsedSeconds > 0 && onUpdateTask) {
+      onUpdateTask(task.id, { actualTimeSpent: (task.actualTimeSpent || 0) + elapsedSeconds });
+    }
+    onCompleteTask(task.id);
+  };
+
+  const cycleAmbientSound = () => {
+    const sounds: AmbientSound[] = ['none', 'white', 'brown'];
+    setAmbientSound(prev => sounds[(sounds.indexOf(prev) + 1) % sounds.length]);
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-6 sm:p-12 text-white">
+      <div className="absolute top-6 right-6">
+        <button 
+          onClick={cycleAmbientSound}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${
+            ambientSound !== 'none' 
+              ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10' 
+              : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:border-slate-600'
+          }`}
+          title="Toggle Ambient Sound"
+        >
+          <Headphones size={18} />
+          <span className="text-sm font-medium capitalize">
+            {ambientSound === 'none' ? 'Noises Off' : `${ambientSound} Noise`}
+          </span>
+        </button>
+      </div>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -131,7 +240,7 @@ export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
               Mark Completed
             </button>
             <button 
-              onClick={onClose}
+              onClick={handleClose}
               className="px-6 py-3 text-slate-400 hover:text-white font-medium transition-colors"
             >
               Take a Break (Close)
@@ -146,7 +255,7 @@ export function FocusMode({ task, onClose, onCompleteTask }: FocusModeProps) {
               {isActive ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-1" />}
             </button>
             <button 
-              onClick={onClose}
+              onClick={handleClose}
               className="w-12 h-12 rounded-full border border-slate-700 text-slate-400 flex items-center justify-center hover:bg-slate-800 hover:text-white transition-all"
               title="Abort Focus Mode"
             >

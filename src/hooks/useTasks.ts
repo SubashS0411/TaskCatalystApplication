@@ -129,6 +129,10 @@ export function useTasks() {
     });
   };
 
+  const importTasks = (newTasks: Task[]) => {
+    setTasks(newTasks);
+  };
+
   return {
     tasks,
     addTask,
@@ -136,5 +140,6 @@ export function useTasks() {
     deleteTask,
     toggleCompletion,
     reorderTask,
+    importTasks,
   };
 }
