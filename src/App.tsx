@@ -5,8 +5,9 @@ import { CreateTaskForm } from './components/CreateTaskForm';
 import { FocusMode } from './components/FocusMode';
 import { IntegrationsModal } from './components/IntegrationsModal';
 import { BrainDumpModal } from './components/BrainDumpModal';
+import { DashboardStats } from './components/DashboardStats';
 import { Task } from './types';
-import { Search, Cloud, Sparkles } from 'lucide-react';
+import { Search, Cloud, Sparkles, BarChart3 } from 'lucide-react';
 
 export default function App() {
   const { tasks, addTask, updateTask, deleteTask, toggleCompletion, reorderTask } = useTasks();
@@ -14,6 +15,7 @@ export default function App() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
   const [isBrainDumpOpen, setIsBrainDumpOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
   const [focusTask, setFocusTask] = useState<Task | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,6 +132,14 @@ export default function App() {
 
         <div className="flex items-center gap-4 sm:gap-6">
           <button
+            onClick={() => setIsStatsOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-semibold transition-colors"
+          >
+            <BarChart3 size={18} />
+            <span className="hidden sm:inline">Stats</span>
+          </button>
+          
+          <button
             onClick={() => setIsIntegrationsOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-semibold transition-colors"
           >
@@ -199,6 +209,13 @@ export default function App() {
             generatedTasks.forEach(t => addTask(t));
             setIsBrainDumpOpen(false);
           }}
+        />
+      )}
+
+      {isStatsOpen && (
+        <DashboardStats
+          tasks={tasks}
+          onClose={() => setIsStatsOpen(false)}
         />
       )}
 
