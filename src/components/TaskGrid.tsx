@@ -8,11 +8,25 @@ interface TaskGridProps {
   onDelete: (id: string) => void;
   onEdit: (task: Task) => void;
   onStartFocus: (task: Task) => void;
+  onDropTask?: (taskId: string, overId: string | null, isUrgent: boolean, isImportant: boolean) => void;
 }
 
-export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartFocus }: TaskGridProps) {
+export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartFocus, onDropTask }: TaskGridProps) {
   const getTasks = (isUrgent: boolean, isImportant: boolean) => 
     tasks.filter(t => t.isUrgent === isUrgent && t.isImportant === isImportant);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, isUrgent: boolean, isImportant: boolean) => {
+    e.preventDefault();
+    if (e.defaultPrevented) return;
+    const taskId = e.dataTransfer.getData('taskId');
+    if (taskId && onDropTask) {
+      onDropTask(taskId, null, isUrgent, isImportant);
+    }
+  };
 
   const quadrants = [
     {
@@ -25,6 +39,8 @@ export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartF
       badgeColor: 'text-rose-600 bg-rose-100',
       containerClass: 'bg-white rounded-xl shadow-md overflow-hidden',
       tasks: getTasks(true, true),
+      isUrgent: true,
+      isImportant: true,
       canFocus: true,
       emptyTitle: 'Nothing urgent right now.'
     },
@@ -38,6 +54,8 @@ export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartF
       badgeColor: 'text-indigo-600 bg-indigo-100',
       containerClass: 'bg-white rounded-xl shadow-md overflow-hidden',
       tasks: getTasks(false, true),
+      isUrgent: false,
+      isImportant: true,
       canFocus: true,
       emptyTitle: 'No tasks scheduled.'
     },
@@ -51,6 +69,8 @@ export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartF
       badgeColor: 'text-amber-600 bg-amber-100',
       containerClass: 'bg-white rounded-xl shadow-md overflow-hidden',
       tasks: getTasks(true, false),
+      isUrgent: true,
+      isImportant: false,
       canFocus: false,
       emptyTitle: 'Nothing to delegate.'
     },
@@ -64,6 +84,8 @@ export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartF
       badgeColor: 'text-slate-500 bg-slate-200',
       containerClass: 'bg-white rounded-xl shadow-md overflow-hidden opacity-80',
       tasks: getTasks(false, false),
+      isUrgent: false,
+      isImportant: false,
       canFocus: false,
       emptyTitle: 'Clean quadrant!'
     }
@@ -72,7 +94,12 @@ export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartF
   return (
     <div className="flex-1 grid grid-cols-1 md:grid-cols-2 grid-rows-[auto_auto] md:grid-rows-2 gap-4 h-full min-h-0">
       {quadrants.map(q => (
-        <section key={q.id} className={`flex flex-col border-t-4 ${q.colorClass} ${q.containerClass} min-h-[300px] md:min-h-0`}>
+        <section 
+          key={q.id} 
+          className={`flex flex-col border-t-4 ${q.colorClass} ${q.containerClass} min-h-[300px] md:min-h-0 relative transition-transform duration-200 ease-out`}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, q.isUrgent, q.isImportant)}
+        >
           <header className={`flex flex-none items-center justify-between p-4 border-b ${q.headerBg}`}>
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${q.dotColor}`}></span>
@@ -98,6 +125,9 @@ export function TaskGrid({ tasks, onToggleCompletion, onDelete, onEdit, onStartF
                      onDelete={onDelete}
                      onEdit={onEdit}
                      onStartFocus={q.canFocus ? onStartFocus : undefined}
+                     onDropTask={(taskId) => {
+                        if (onDropTask) onDropTask(taskId, task.id, q.isUrgent, q.isImportant);
+                     }}
                    />
                  ))}
                </div>

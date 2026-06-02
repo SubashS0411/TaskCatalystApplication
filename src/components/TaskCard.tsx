@@ -9,9 +9,10 @@ interface TaskCardProps {
   onDelete: (id: string) => void;
   onEdit: (task: Task) => void;
   onStartFocus?: (task: Task) => void; // Optional because only Q1 and Q2 can have Focus Mode
+  onDropTask?: (taskId: string) => void;
 }
 
-export function TaskCard({ task, onToggleCompletion, onDelete, onEdit, onStartFocus }: TaskCardProps) {
+export function TaskCard({ task, onToggleCompletion, onDelete, onEdit, onStartFocus, onDropTask }: TaskCardProps) {
   const getRelativeTimeText = (timestamp: number) => {
     const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
     const daysDifference = Math.round((timestamp - Date.now()) / (1000 * 60 * 60 * 24));
@@ -39,8 +40,31 @@ export function TaskCard({ task, onToggleCompletion, onDelete, onEdit, onStartFo
 
   const strikeClass = task.isCompleted ? 'line-through text-slate-500 font-medium' : '';
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('taskId', task.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const taskId = e.dataTransfer.getData('taskId');
+    if (taskId && taskId !== task.id && onDropTask) {
+      onDropTask(taskId);
+    }
+  };
+
   return (
-    <div className={`${baseClass} ${completedClass} ${overdueClass}`}>
+    <div 
+      className={`${baseClass} ${completedClass} ${overdueClass} cursor-grab active:cursor-grabbing`}
+      draggable
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div className="flex items-start justify-between gap-3">
         <button 
           onClick={() => onToggleCompletion(task.id)}
@@ -73,8 +97,13 @@ export function TaskCard({ task, onToggleCompletion, onDelete, onEdit, onStartFo
             </p>
           )}
 
-          {(task.dueDate || (task.recurrence && task.recurrence !== 'none')) && (
+          {(task.dueDate || (task.recurrence && task.recurrence !== 'none') || task.estimatedTime) && (
             <div className={`flex items-center gap-1.5 mt-2 text-[10px] font-medium ${isOverdue ? 'text-red-500' : 'text-slate-400'}`}>
+              {task.estimatedTime && (
+                <div className="flex items-center gap-0.5 text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded">
+                  <span>~{task.estimatedTime}m</span>
+                </div>
+              )}
               {task.dueDate && (
                 <div className="flex items-center gap-1">
                   <Clock size={12} />

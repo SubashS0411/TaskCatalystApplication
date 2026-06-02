@@ -105,11 +105,36 @@ export function useTasks() {
     });
   };
 
+  const reorderTask = (activeId: string, overId: string | null, isUrgent: boolean, isImportant: boolean) => {
+    setTasks((prev) => {
+      const activeIndex = prev.findIndex((t) => t.id === activeId);
+      if (activeIndex === -1) return prev;
+      
+      const activeTask = prev[activeIndex];
+      const newTasks = [...prev];
+      
+      newTasks.splice(activeIndex, 1);
+      const updatedTask = { ...activeTask, isUrgent, isImportant };
+      
+      if (overId) {
+        const overIndex = newTasks.findIndex((t) => t.id === overId);
+        if (overIndex !== -1) {
+          newTasks.splice(overIndex, 0, updatedTask);
+          return newTasks;
+        }
+      }
+      
+      newTasks.push(updatedTask);
+      return newTasks;
+    });
+  };
+
   return {
     tasks,
     addTask,
     updateTask,
     deleteTask,
     toggleCompletion,
+    reorderTask,
   };
 }

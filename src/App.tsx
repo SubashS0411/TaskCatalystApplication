@@ -4,17 +4,22 @@ import { TaskGrid } from './components/TaskGrid';
 import { CreateTaskForm } from './components/CreateTaskForm';
 import { FocusMode } from './components/FocusMode';
 import { IntegrationsModal } from './components/IntegrationsModal';
+import { BrainDumpModal } from './components/BrainDumpModal';
 import { Task } from './types';
-import { Search, Cloud } from 'lucide-react';
+import { Search, Cloud, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const { tasks, addTask, updateTask, deleteTask, toggleCompletion } = useTasks();
-  
+  const { tasks, addTask, updateTask, deleteTask, toggleCompletion, reorderTask } = useTasks();
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
+  const [isBrainDumpOpen, setIsBrainDumpOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
   const [focusTask, setFocusTask] = useState<Task | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [consecutiveQ1, setConsecutiveQ1] = useState(0);
+  const [suggestedBreakTask, setSuggestedBreakTask] = useState<Task | undefined>(undefined);
 
   const handleOpenNewTask = () => {
     setEditingTask(undefined);
@@ -41,8 +46,50 @@ export default function App() {
     setEditingTask(undefined);
   };
 
+  const handleToggleCompletion = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    
+    // If completing a Q1 task
+    if (!task.isCompleted && task.isUrgent && task.isImportant) {
+      const newStreak = consecutiveQ1 + 1;
+      setConsecutiveQ1(newStreak);
+      
+      if (newStreak >= 3) {
+        // Suggest a Q3 task
+        const q3Tasks = tasks.filter(t => t.isUrgent && !t.isImportant && !t.isCompleted);
+        if (q3Tasks.length > 0) {
+          // Select a random or shortest Q3 task
+          const suggestion = q3Tasks.sort((a, b) => (a.estimatedTime || 0) - (b.estimatedTime || 0))[0];
+          setSuggestedBreakTask(suggestion);
+        } else {
+          // Or just a general break message if no Q3 tasks
+          setSuggestedBreakTask({
+            id: 'break',
+            title: 'Take a break!',
+            description: 'You have worked hard. Time to rest your brain.',
+            isUrgent: false,
+            isImportant: false,
+            isCompleted: false,
+            createdAt: Date.now()
+          } as Task);
+        }
+        setConsecutiveQ1(0); // reset streak
+      }
+    } else if (!task.isCompleted) {
+      // Completing a non-Q1 task breaks the "high intensity" streak
+      setConsecutiveQ1(0);
+    }
+
+    toggleCompletion(id);
+  };
+
   const handleCompleteFromFocus = (id: string) => {
-    updateTask(id, { isCompleted: true });
+    handleToggleCompletion(id);
+  };
+
+  const handleDropTask = (taskId: string, overId: string | null, isUrgent: boolean, isImportant: boolean) => {
+    reorderTask(taskId, overId, isUrgent, isImportant);
   };
 
   const filteredTasks = useMemo(() => {
@@ -90,12 +137,21 @@ export default function App() {
             <span className="hidden sm:inline">Integrations</span>
           </button>
           
-          <button
-            onClick={handleOpenNewTask}
-            className="whitespace-nowrap px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            + Add Task
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsBrainDumpOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow"
+            >
+              <Sparkles size={16} />
+              Brain Dump
+            </button>
+            <button
+              onClick={handleOpenNewTask}
+              className="whitespace-nowrap px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              + Add Task
+            </button>
+          </div>
         </div>
       </header>
 
@@ -103,10 +159,11 @@ export default function App() {
       <main className="flex-1 w-full max-w-7xl mx-auto p-6 min-h-0 flex flex-col">
         <TaskGrid 
           tasks={filteredTasks}
-          onToggleCompletion={toggleCompletion}
+          onToggleCompletion={handleToggleCompletion}
           onDelete={deleteTask}
           onEdit={handleEditTask}
           onStartFocus={setFocusTask}
+          onDropTask={handleDropTask}
         />
       </main>
 
@@ -133,6 +190,59 @@ export default function App() {
           tasks={tasks}
           onImportTask={addTask}
         />
+      )}
+
+      {isBrainDumpOpen && (
+        <BrainDumpModal
+          onClose={() => setIsBrainDumpOpen(false)}
+          onTasksGenerated={(generatedTasks) => {
+            generatedTasks.forEach(t => addTask(t));
+            setIsBrainDumpOpen(false);
+          }}
+        />
+      )}
+
+      {suggestedBreakTask && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden text-center p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <Sparkles size={32} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">Prevent Burnout</h2>
+              <p className="text-sm text-slate-500 mt-2">
+                You've completed 3 high-intensity tasks back-to-back! To prevent cognitive fatigue, we suggest tackling a lower-effort task next.
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 border border-slate-100 p-4 rounded-lg text-left">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Suggested Task</p>
+              <p className="font-semibold text-slate-800 text-sm truncate">{suggestedBreakTask.title}</p>
+              {suggestedBreakTask.estimatedTime && (
+                 <p className="text-xs text-slate-500 mt-1">Est. time: {suggestedBreakTask.estimatedTime}m</p>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                const bTask = suggestedBreakTask;
+                setSuggestedBreakTask(undefined);
+                if (bTask.id !== 'break' && !bTask.isCompleted) {
+                  setFocusTask(bTask);
+                }
+              }}
+              className="w-full py-2.5 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              {suggestedBreakTask.id === 'break' ? 'Got it' : 'Focus on this task'}
+            </button>
+            <button
+              onClick={() => setSuggestedBreakTask(undefined)}
+              className="w-full py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              No thanks, I'll choose my own
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -8,6 +8,7 @@ export interface Task {
   isImportant: boolean;
   dueDate?: number; // timestamp
   recurrence?: RecurrencePattern;
+  estimatedTime?: number; // minutes
   isCompleted: boolean;
   createdAt: number;
 }
